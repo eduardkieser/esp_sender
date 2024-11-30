@@ -44,17 +44,27 @@ void sendFrame(WiFiClient& client, camera_fb_t* fb) {
     client.write("\r\n", 2);
 }
 
+void addCorsHeaders() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Methods", "GET");
+    server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 void handleStream() {
     if (clients.size() >= MAX_CLIENTS) {
+        addCorsHeaders();
         server.send(503, "text/plain", "Server is at maximum capacity");
         return;
     }
 
     WiFiClient client = server.client();
     String response = "HTTP/1.1 200 OK\r\n";
+    response += "Access-Control-Allow-Origin: *\r\n";
+    response += "Access-Control-Allow-Methods: GET\r\n";
+    response += "Access-Control-Allow-Headers: Content-Type\r\n";
     response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n";
-    client.write(response.c_str(), response.length());
 
+    client.write(response.c_str(), response.length());
     ClientStream newClient = {client, millis(), true};
     clients.push_back(newClient);
 }
@@ -93,6 +103,7 @@ void configInitCamera() {
 }
 
 void handleRoot() {
+    addCorsHeaders();
     String html = "<html><head>";
     html += "<style>";
     html += "body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }";
@@ -130,6 +141,11 @@ void setup() {
     Serial.print("Camera Ready! Use 'http://");
     Serial.print(WiFi.localIP());
     Serial.println("/stream' to connect");
+
+    server.on("/stream", HTTP_OPTIONS, []() {
+        addCorsHeaders();
+        server.send(204);
+    });
 
     server.on("/", handleRoot);
     server.on("/stream", handleStream);
